@@ -1,6 +1,9 @@
-import requests
+import aiohttp
+import asyncio
 import json
-import time
+import logging
+from retrying import retry
+from typing import Optional
 
 # Base URL, cookies, and headers from your successful code
 base_url = 'https://onlyaccounts.io/api/filter'
@@ -29,26 +32,27 @@ def fetch_and_save_data(page):
         'q': 'best-onlyfans',
         'l': 'en',
         'p': page,
+        'l': 'en',
+        'p': page,
     }
 
-    response = requests.get(base_url, params=params, cookies=cookies, headers=headers)
-    if response.ok:
-        data = response.json()
-        with open(f'data{page}.json', 'w') as f:
-            json.dump(data, f, indent=4)
-        print(f'Data for page {page} saved successfully.')
-        return data
-    else:
-        print(f'Failed to fetch data for page {page}. Status code: {response.status_code}')
-        if response.text:
-            print("Response text:", response.text)  # Log detailed error message if available
-        return None
+    async with session.get(base_url, params=params, cookies=cookies, headers=headers) as response:
+        if response.status == 200:
+            data = await response.json()
+            with open('aggregated_data.json', 'a') as f:
+                json.dump(data, f, indent=4)
+            logging.info(f'Data for page {page} saved successfully.')
+            return data
+        else:
+            logging.error(f'Failed to fetch data for page {page}. Status code: {response.status}')
+            return None
 
-def fetch_all_data(total_pages):
-    for page in range(500, total_pages + 1):
-        print(f"Fetching data for page {page}...")
-        fetch_and_save_data(page)
-        time.sleep(1)  # Sleep to respect rate limits
+async def fetch_all_data(total_pages: int):
+    """Fetch data for all pages."""
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_and_save_data(session, page) for page in range(500, total_pages + 1)]
+        await asyncio.gather(*tasks)
 
-# Example usage:
-fetch_all_data(1000)
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(fetch_all_data(1000))

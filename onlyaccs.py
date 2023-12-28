@@ -27,25 +27,29 @@ headers = {
     'sec-fetch-site': 'same-origin',
     'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
 }
-def fetch_and_save_data(page):
+async def fetch_and_save_data(session, page):
     params = {
         'q': 'best-onlyfans',
         'l': 'en',
         'p': page,
-        'l': 'en',
-        'p': page,
     }
 
-    async with session.get(base_url, params=params, cookies=cookies, headers=headers) as response:
-        if response.status == 200:
+    for attempt in range(3):
+        try:
+            async with session.get(base_url, params=params, cookies=cookies, headers=headers) as response:
+                if response.status == 200:
             data = await response.json()
             with open('aggregated_data.json', 'a') as f:
                 json.dump(data, f, indent=4)
             logging.info(f'Data for page {page} saved successfully.')
             return data
         else:
-            logging.error(f'Failed to fetch data for page {page}. Status code: {response.status}')
-            return None
+                else:
+                    logging.error(f'Failed to fetch data for page {page}. Status code: {response.status} Attempt: {attempt+1}')
+                    await asyncio.sleep(1)
+        except Exception as e:
+            logging.error(f'An error occurred: {e}. Attempt: {attempt+1}')
+            await asyncio.sleep(1)
 
 async def fetch_all_data(total_pages: int):
     """Fetch data for all pages."""
